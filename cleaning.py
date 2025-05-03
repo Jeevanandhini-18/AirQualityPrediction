@@ -1,115 +1,89 @@
-# Import necessary libraries
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
-# Data Preprocessing
-# Load data from the CSV file (separated by ';' and ',' as decimal)
-air_quality_data = pd.read_csv('data/AirQuality.csv', sep=';', decimal=',')
+def load_and_clean_data(file_path='data/AirQuality.csv', verbose=False):
+    """
+    Loads, cleans, and preprocesses air quality data from the specified CSV file.
 
-# Show the first 5 rows of the dataset
-print(air_quality_data.head())
+    Parameters:
+        file_path (str): Path to the Air Quality dataset.
+        verbose (bool): If True, prints intermediate results for debugging.
 
-# Remove the last two columns which have NaN values (using slicing)
-air_quality_data = air_quality_data.iloc[:, :-2]
+    Returns:
+        pd.DataFrame: The cleaned and preprocessed DataFrame.
+    """
+    # Load CSV with appropriate separators
+    df = pd.read_csv(file_path, sep=';', decimal=',')
 
-# Show the last 5 rows of the dataset
-print(air_quality_data.tail())
+    if verbose:
+        print("Initial data shape:", df.shape)
+        print(df.head())
 
-# Check the number of rows and columns
-print("Shape of the data:", air_quality_data.shape)
+    # Remove last two unnamed columns and keep only first 9357 rows
+    df = df.iloc[:, :-2]
+    df = df.head(9357)
 
-# Show the last row of the dataset
-print(air_quality_data.loc[[9356]])
+    if verbose:
+        print("After removing last two columns and trimming rows:", df.shape)
 
-# Display the first 9357 rows (removes NaN rows)
-air_quality_data = air_quality_data.head(9357)
-print(air_quality_data)
+    # Replace -200 with NaN (representing missing values)
+    df.replace(to_replace=-200, value=np.nan, inplace=True)
 
-# Show first few rows again
-print(air_quality_data.head())
-print(air_quality_data.tail())
-print("Shape after cleanup:", air_quality_data.shape)
+    if verbose:
+        print("Count of -200 values per column:")
+        print(df.isin([-200]).sum())
 
-# Checking the info of the data
-air_quality_data.info()
+    # Fill NaN values with column mean (only for numeric columns)
+    df.fillna(df.select_dtypes(include='number').mean(), inplace=True)
 
-# Checking the number of missing values in the dataset
-print("Missing values count:")
-print(air_quality_data.isnull().sum())
+    if verbose:
+        print("After handling missing values:")
+        print(df.isnull().sum())
 
-# Missing value analysis: Check for -200 values (which indicate missing data)
-print("Counting -200 values (representing missing values):")
-print(air_quality_data.isin([-200]).sum(axis=0))
+    # Drop duplicate rows
+    duplicate_count = df.duplicated().sum()
+    if verbose:
+        print(f"Duplicate rows found: {duplicate_count}")
+    df.drop_duplicates(inplace=True)
 
-# Handling missing values
-# Convert all -200 values to NaN and replace them with the column mean
-air_quality_data = air_quality_data.replace(to_replace=-200, value=np.nan)
-print("After replacing -200 with NaN:")
-print(air_quality_data.tail())
+    # Fix time formatting from 'HH.MM.SS' to 'HH:MM:SS'
+    df['Time'] = df['Time'].str.replace('.', ':', regex=False)
 
-# Finding the mean of each column
-print("Mean of each column:")
-print(air_quality_data.select_dtypes(include='number').mean())
+    # Combine Date and Time into a single DateTime column
+    df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], dayfirst=True)
+    df.drop(columns=['Date', 'Time'], inplace=True)
 
-# Replace missing values with the mean of the column
-air_quality_data = air_quality_data.fillna(air_quality_data.select_dtypes(include='number').mean())
-print("After filling NaN values with mean:")
-print(air_quality_data.tail())
+    if verbose:
+        print("After creating DateTime column:")
+        print(df[['DateTime']].head())
 
-# Check again for missing values
-print("Missing values count after imputation:")
-print(air_quality_data.isnull().sum())
+    # Outlier detection and handling using IQR method
+    num_cols = df.select_dtypes(include='number').columns
+    for column in num_cols:
+        q1 = df[column].quantile(0.25)
+        q3 = df[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_limit = q1 - 1.5 * iqr
+        upper_limit = q3 + 1.5 * iqr
+        median = df[column].median()
+        outlier_count = df[(df[column] < lower_limit) | (df[column] > upper_limit)].shape[0]
 
-# Check for duplicate rows
-duplicate_count = air_quality_data.duplicated().sum()
-print(f"Duplicate Rows: {duplicate_count}")
+        if verbose:
+            print(f"{column} - Outliers detected: {outlier_count}")
 
-# Remove duplicates if any
-air_quality_data.drop_duplicates(inplace=True)
+        df[column] = df[column].apply(lambda x: median if x < lower_limit or x > upper_limit else x)
 
-# Convert time from 'HH.MM.SS' to 'HH:MM:SS'
-air_quality_data['Time'] = air_quality_data['Time'].str.replace('.', ':', regex=False)
-print("After converting time format:")
-print(air_quality_data.head())
+    # Standardize numeric data
+    scaler = StandardScaler()
+    df[num_cols] = scaler.fit_transform(df[num_cols])
 
-# Combine Date and Time into a single DateTime column
-air_quality_data['DateTime'] = pd.to_datetime(air_quality_data['Date'] + ' ' + air_quality_data['Time'], dayfirst=True)
-air_quality_data = air_quality_data.drop(columns=['Date', 'Time'])
-print("After combining Date and Time into DateTime:")
-print(air_quality_data.head())
+    if verbose:
+        print("Final cleaned data preview:")
+        print(df.head())
 
-# Outlier Detection and Handling
-# Selecting only the numeric columns for outlier detection
-num_cols = air_quality_data.select_dtypes(include='number').columns
-
-# Identifying and handling outliers using IQR
-for column in num_cols:
-    q1 = air_quality_data[column].quantile(0.25)
-    q3 = air_quality_data[column].quantile(0.75)
-    iqr = q3 - q1
-
-    # Setting thresholds to detect outliers
-    lower_limit = q1 - 1.5 * iqr
-    upper_limit = q3 + 1.5 * iqr
-
-    # Finding outliers
-    outlier_rows = air_quality_data[(air_quality_data[column] < lower_limit) | (air_quality_data[column] > upper_limit)]
-    print(f"{column} - Total outliers: {len(outlier_rows)}")
-
-    # Replacing outliers with the median of the column
-    col_median = air_quality_data[column].median()
-    air_quality_data[column] = air_quality_data[column].apply(lambda x: col_median if x < lower_limit or x > upper_limit else x)
-
-# Data Scaling
-# Scale the numeric data using StandardScaler
-numeric_cols = air_quality_data.select_dtypes(include='number').columns
-scaler = StandardScaler()
-
-# Fit and transform the data
-air_quality_data[numeric_cols] = scaler.fit_transform(air_quality_data[numeric_cols])
-
-# Show the scaled data
-print("Data after scaling:")
-print(air_quality_data.head())
+    return df
+# Calling to display
+if __name__ == "__main__":
+    df_cleaned = load_and_clean_data(verbose=True)
+    print("Final cleaned data shape:", df_cleaned.shape)
