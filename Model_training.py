@@ -130,7 +130,3 @@ def predict_new_input(new_input_array):
 
     return combined, alert
 
-# Example:
-# new_input = np.array([...])  # Replace with real-time features
-# prediction, alert = predict_new_input(new_input)
-# print(f"Predicted CO: {prediction:.2f} ppm → {alert}")
