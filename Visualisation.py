@@ -110,7 +110,7 @@ plt.show()
 importances = rf_model.feature_importances_
 feature_names = X_ml.columns
 
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(10, 6))     
 plt.barh(feature_names, importances, color='teal')
 plt.title("Feature Importance (Random Forest)")
 plt.xlabel("Importance")
