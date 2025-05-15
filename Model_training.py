@@ -5,6 +5,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from keras.models import Sequential, load_model
 from keras.layers import LSTM, Dense
 from keras.callbacks import EarlyStopping
+from keras.metrics import MeanSquaredError  # Import MeanSquaredError metric
 import joblib
 
 # ------------------------
@@ -52,7 +53,9 @@ print("\nTraining LSTM...")
 lstm_model = Sequential()
 lstm_model.add(LSTM(64, input_shape=(X_train_lstm.shape[1], X_train_lstm.shape[2])))
 lstm_model.add(Dense(1))
-lstm_model.compile(optimizer='adam', loss='mse')
+
+# Compile the LSTM model with MeanSquaredError() metric
+lstm_model.compile(optimizer='adam', loss='mse', metrics=[MeanSquaredError()])
 
 early_stop = EarlyStopping(monitor='val_loss', patience=5)
 lstm_model.fit(X_train_lstm, y_train_lstm,
@@ -120,7 +123,7 @@ def predict_new_input(new_input_array):
     Returns combined prediction and health alert.
     """
     rf_model_loaded = joblib.load("random_forest_model.pkl")
-    lstm_model_loaded = load_model("lstm_model.h5")
+    lstm_model_loaded = load_model("lstm_model.h5", custom_objects={'MeanSquaredError': MeanSquaredError})  # Explicitly load custom metric
 
     rf_prediction = rf_model_loaded.predict(new_input_array.reshape(1, -1))[0]
     lstm_prediction = lstm_model_loaded.predict(new_input_array.reshape(1, new_input_array.shape[0], 1)).flatten()[0]
@@ -129,4 +132,3 @@ def predict_new_input(new_input_array):
     alert = health_risk_alert(combined)
 
     return combined, alert
-
