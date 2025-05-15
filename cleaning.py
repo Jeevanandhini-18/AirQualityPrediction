@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
@@ -15,7 +15,11 @@ def load_and_clean_data(file_path='data/AirQuality.csv', verbose=False):
     """
     # Load CSV with appropriate separators
     df = pd.read_csv(file_path, sep=';', decimal=',')
-
+    if verbose:
+        print("Before Transformation:")
+        # Displaying missing values before processing
+        print(df.isnull().sum())
+        
     if verbose:
         print("Initial data shape:", df.shape)
         print(df.head())
@@ -82,8 +86,13 @@ def load_and_clean_data(file_path='data/AirQuality.csv', verbose=False):
         print("Final cleaned data preview:")
         print(df.head())
 
+    # Save cleaned data to CSV so frontend can load this cleaned file directly
+    df.to_csv('cleaned_air_quality.csv', index=False)
+    if verbose:
+        print("Cleaned data saved to cleaned_air_quality.csv")
+
     return df
-# Calling to display
+
+# For standalone execution and debugging
 if __name__ == "__main__":
-    df_cleaned = load_and_clean_data(verbose=True)
-    print("Final cleaned data shape:", df_cleaned.shape)
+    load_and_clean_data(verbose=True)
